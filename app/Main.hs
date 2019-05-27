@@ -16,9 +16,15 @@ symbol = oneOf "!#$%&|*+-/:<+<?@^_~"
 parseString :: Parser LispVal
 parseString = do 
                 char '"'
-                x <- many (noneOf "\"")
+                x <- many chars
                 char '"'
                 return $ String x
+    where chars = noneOf "\"" <|> escaped
+          escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
+          escapedChar :: Char -> Char -> Parser Char
+          escapedChar code replacement = char code >> return replacement
+          codes = ['b', 'n', 'f', 'r', 't', '\\', '\"', '/']
+          replacements = ['\b', '\n', '\f', '\r', '\t', '\\', '\"', '/']
 
 parseAtom :: Parser LispVal
 parseAtom = do
@@ -31,7 +37,15 @@ parseAtom = do
                          _    -> Atom atom
 
 parseNumber :: Parser LispVal
+  
 parseNumber = liftM (Number . read) $ many1 digit
+-- parseNumber = do 
+--                 stringNum <- many1 digit
+--                 return $ (Number . read) stringNum 
+
+-- parseNumber = many1 digit >>= \numString -> Number (read numString)
+-- figure out how to do the bind ^^^^
+
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
