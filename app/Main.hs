@@ -1,9 +1,11 @@
 module Main where
 
 import Control.Monad
+import Data.Complex
+import Data.Ratio
 import Numeric
 import System.Environment
-import Text.ParserCombinators.Parsec hiding (spaces)
+import Text.ParserCombinators.Parsec
 
 data LispVal
   = Atom String
@@ -13,7 +15,9 @@ data LispVal
   | String String
   | Bool Bool
   | Character Char
-  | Float Float
+  | Float Double
+  | Ratio Rational
+  | Complex (Complex Double)
 
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<+<?@^_~"
@@ -37,6 +41,13 @@ escapedChars = do
       'r' -> '\r'
       't' -> '\t'
 
+parseRatio :: Parser LispVal
+parseRatio = do
+  x <- many1 digit
+  char '/'
+  y <- many1 digit
+  return $ Ratio (read x % read y)
+
 parseCharacter :: Parser Char
 parseCharacter = do
   try $ string "#\\"
@@ -58,6 +69,14 @@ parseAtom = do
   rest <- many (letter <|> digit <|> symbol)
   let atom = first : rest
   return $ Atom atom
+
+parseComplex :: Parser LispVal
+parseComplex = do
+  x <- try parseFloat <|> parseDecimal
+  char '+'
+  y <- try parseFloat <|> parseDecimal
+  char 'i'
+  return $ Complex (toDouble x :+ toDouble y)
 
 parseBool :: Parser LispVal
 parseBool = do
@@ -109,8 +128,19 @@ bin2dig' digint (x:xs) =
            else 1)
    in bin2dig' old xs
 
+parseFloat :: Parser LispVal
+parseFloat = do
+  x <- many1 digit
+  char '.'
+  y <- many1 digit
+  return $ Float (fst . head $readFloat (x ++ "." ++ y))
+
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> try parseNumber <|> try parseBool <|> try parseCharacter
+parseExpr =
+  parseAtom <|> parseString <|> try parseFloat <|> try parseRatio <|> try parseComplex <|>
+  try parseNumber <|>
+  try parseBool <|>
+  try parseCharacter
 
 spaces :: Parser ()
 spaces = skipMany1 space
